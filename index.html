@@ -203,7 +203,7 @@
         #clearAllDataBtn {
             display: block; 
             width: 100%; 
-            max-width: 280px; /* 稍微縮小寬度 */
+            max-width: 280px; 
             margin: 30px auto 10px; 
             text-align: center; 
             padding: 12px; 
@@ -217,7 +217,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>成績管理系統</h1>
+        <h1>班級成績管理系統</h1>
 
         <div class="control-panel">
             <div class="control-group">
@@ -257,7 +257,18 @@
             
             const routineTestFields = Array.from({ length: 30 }, (_, i) => `平${i + 1}`); 
             
+            // 這些是成績的細項類型
             const gradeTypes = [
+                "總平均",              
+                "平時加分平均",        
+                "定期評量成績",        
+                "日常加分欄",          
+                "定期",                
+                ...routineTestFields 
+            ];
+            
+            // 匯出時需要的欄位 (不包含 姓名 和 科目)
+            const exportGradeFields = [
                 "總平均",              
                 "平時加分平均",        
                 "定期評量成績",        
@@ -342,7 +353,7 @@
                 grades[`${subject}-定期評量成績`] = routineScore.toFixed(2);
             }
             
-            // ------------------- CSV 匯出功能 (略) -------------------
+            // ------------------- CSV 匯出功能 (修正為每科目分行) -------------------
 
             function exportGradesToCSV() {
                 if (Object.keys(studentData).length === 0) {
@@ -350,28 +361,31 @@
                     return;
                 }
 
+                // 1. 確保所有計算欄位都是最新的
                 Object.keys(studentData).forEach(studentId => {
                     subjects.forEach(subject => {
                         calculateGrades(studentId, subject);
                     });
                 });
 
-                let header = '學生姓名';
-                subjects.forEach(subject => {
-                    gradeTypes.forEach(type => {
-                        const cleanedType = type.replace('加分平均', '平均');
-                        header += `,"${subject}-${cleanedType}"`; 
-                    });
+                // 2. 建立新格式表頭 (學生, 科目, 所有成績細項)
+                let header = '學生姓名,科目';
+                exportGradeFields.forEach(type => {
+                    const cleanedType = type.replace('加分平均', '平均');
+                    header += `,"${cleanedType}"`; 
                 });
 
                 let csvContent = header + '\n';
 
+                // 3. 建立資料列 (學生 x 科目 數量)
                 Object.keys(studentData).forEach(studentId => {
                     const student = studentData[studentId];
-                    let row = `"${student.name}"`; 
-
+                    const studentName = student.name;
+                    
                     subjects.forEach(subject => {
-                        gradeTypes.forEach(type => {
+                        let row = `"${studentName}","${subject}"`; 
+
+                        exportGradeFields.forEach(type => {
                             const gradeKey = `${subject}-${type}`;
                             let score = student.grades[gradeKey] !== undefined ? student.grades[gradeKey] : '';
 
@@ -387,11 +401,11 @@
                             
                             row += `,"${score}"`;
                         });
+                        csvContent += row + '\n'; // 每一個科目就是獨立的一行
                     });
-                    
-                    csvContent += row + '\n';
                 });
 
+                // 4. 創建並下載 Blob
                 const BOM = "\uFEFF"; 
                 const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
@@ -399,7 +413,7 @@
                 if (link.download !== undefined) {
                     const url = URL.createObjectURL(blob);
                     link.setAttribute("href", url);
-                    link.setAttribute("download", `班級成績_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.csv`);
+                    link.setAttribute("download", `班級成績_分科報表_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.csv`);
                     link.style.visibility = 'hidden';
                     document.body.appendChild(link);
                     link.click();
